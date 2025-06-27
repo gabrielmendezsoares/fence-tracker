@@ -7,14 +7,50 @@ const MAXIMUM_QUANTITY = 50;
 
 const prisma = new PrismaClient();
 
+const sendBatchNotification = async (alertMapNotificationList: IAlertMap.IAlertMap[]): Promise<void> => {
+  try {
+    const httpClientInstance = new HttpClientUtil.HttpClient();
+    const messageHeader = '📌 *ALERTA (CERCA)* 📌\n\n';
+
+    const alertMessageList = alertMapNotificationList.map(
+      (alertMap: IAlertMap.IAlertMap): string => {
+        return [
+          '[12-horas]',
+          `- CSID: ${ alertMap.account_code }`,
+          `- Armário: ${ alertMap.cabinet }`,
+          `- Condomínio: ${ alertMap.condominium }`,
+          `- Quantidade: ${ alertMap.quantity }`,
+          `- Zona: ${ alertMap.zone_name }`
+        ].join('\n');
+      }
+    );
+
+    const message = messageHeader + alertMessageList.join('\n\n');
+
+    await httpClientInstance.post<unknown>(
+      `https://v5.chatpro.com.br/${ process.env.CHAT_PRO_INSTANCE_ID }/api/v1/send_message`,
+      {
+        message,
+        number: process.env.CHAT_PRO_NUMBER
+      },
+      { 
+        headers: { Authorization: process.env.CHAT_PRO_BEARER_TOKEN },
+        params: { instance_id: process.env.CHAT_PRO_INSTANCE_ID }
+      }
+    );
+  } catch (error: unknown) {
+    console.log(`Error | Timestamp: ${ momentTimezone().utc().format('DD-MM-YYYY HH:mm:ss') } | Path: src/services/createAlerts.service.ts | Location: sendBatchNotification | Error: ${ error instanceof Error ? error.message : String(error) }`);
+  }
+};
+
 const updateFenceAlerts = async (alertMapList: IAlertMap.IAlertMap[]): Promise<void> => {
-  const keyList: string[] = [];
   const alertMapNotificationList: IAlertMap.IAlertMap[] = [];
+  const keyList: string[] = [];
 
   await Promise.allSettled(
     alertMapList.map(
       async (alertMap: IAlertMap.IAlertMap): Promise<void> => {
-        const key = `${ alertMap.account }-${ alertMap.zone }`;
+        const key = `${ alertMap.account_code }-${ alertMap.zone_name }`;
         const fenceAlert = await prisma.fence_alerts.findUnique({ where: { key }});
         const alertMapQuantityMultiple = Math.round(alertMap.quantity / MAXIMUM_QUANTITY) * MAXIMUM_QUANTITY;
 
@@ -49,42 +85,6 @@ const updateFenceAlerts = async (alertMapList: IAlertMap.IAlertMap[]): Promise<v
 
   if (alertMapNotificationList.length > 0) {
     await sendBatchNotification(alertMapNotificationList);
-  }
-};
-
-const sendBatchNotification = async (alertMapNotificationList: IAlertMap.IAlertMap[]): Promise<void> => {
-  try {
-    const httpClientInstance = new HttpClientUtil.HttpClient();
-    const messageHeader = '📌 *ALERTA (CERCA)* 📌\n\n';
-
-    const alertMessageList = alertMapNotificationList.map(
-      (alertMap: IAlertMap.IAlertMap): string => {
-        return [
-          '[12-horas]',
-          `- CSID: ${ alertMap.account }`,
-          `- Armário: ${ alertMap.cabinet }`,
-          `- Condomínio: ${ alertMap.condominium }`,
-          `- Quantidade: ${ alertMap.quantity }`,
-          `- Zona: ${ alertMap.zone }`
-        ].join('\n');
-      }
-    );
-
-    const message = messageHeader + alertMessageList.join('\n\n');
-
-    await httpClientInstance.post<unknown>(
-      `https://v5.chatpro.com.br/${ process.env.CHAT_PRO_INSTANCE_ID }/api/v1/send_message`,
-      {
-        message,
-        number: process.env.CHAT_PRO_NUMBER
-      },
-      { 
-        headers: { Authorization: process.env.CHAT_PRO_BEARER_TOKEN },
-        params: { instance_id: process.env.CHAT_PRO_INSTANCE_ID }
-      }
-    );
-  } catch (error: unknown) {
-    console.log(`Error | Timestamp: ${ momentTimezone().utc().format('DD-MM-YYYY HH:mm:ss') } | Path: src/services/createAlerts.service.ts | Location: sendBatchNotification | Error: ${ error instanceof Error ? error.message : String(error) }`);
   }
 };
 

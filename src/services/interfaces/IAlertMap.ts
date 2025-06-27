@@ -1,7 +1,7 @@
 export interface IAlertMap {
-  account: string;
+  account_code: string;
   cabinet: string;
   condominium: string;
   quantity: number;
-  zone: string;
+  zone_name: string;
 }
