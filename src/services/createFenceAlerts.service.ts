@@ -7,13 +7,13 @@ const MAXIMUM_QUANTITY = 50;
 
 const prisma = new PrismaClient();
 
-const sendBatchNotification = async (alertMapNotificationList: IAlertMap.IAlertMap[]): Promise<void> => {
+const sendNotification = async (alertMapList: IAlertMap.IAlertMap[]): Promise<void> => {
   try {
     const httpClientInstance = new HttpClientUtil.HttpClient();
     const messageHeader = '📌 *ALERTA (CERCA)* 📌\n\n';
     const messageSubHeader = `Período: ${ momentTimezone().utc().hour() < 12 ? '00:00 - 12:00' : '12:00 - 00:00' }\n\n`;
 
-    const alertMessageList = alertMapNotificationList.map(
+    const alertMessageList = alertMapList.map(
       (alertMap: IAlertMap.IAlertMap): string => {
         return [
           `[${ alertMap.account_code }]`,
@@ -39,21 +39,21 @@ const sendBatchNotification = async (alertMapNotificationList: IAlertMap.IAlertM
       }
     );
   } catch (error: unknown) {
-    console.log(`Error | Timestamp: ${ momentTimezone().utc().format('DD-MM-YYYY HH:mm:ss') } | Path: src/services/createAlerts.service.ts | Location: sendBatchNotification | Error: ${ error instanceof Error ? error.message : String(error) }`);
+    console.log(`Error | Timestamp: ${ momentTimezone().utc().format('DD-MM-YYYY HH:mm:ss') } | Path: src/services/createAlerts.service.ts | Location: sendNotification | Error: ${ error instanceof Error ? error.message : String(error) }`);
   }
 };
 
-const updateFenceAlerts = async (alertMapList: IAlertMap.IAlertMap[]): Promise<void> => {
-  const alertMapNotificationList: IAlertMap.IAlertMap[] = [];
+const processFenceAlerts = async (alertMapListA: IAlertMap.IAlertMap[]): Promise<void> => {
+  const alertMapListB: IAlertMap.IAlertMap[] = [];
 
   await Promise.allSettled(
-    alertMapList.map(
+    alertMapListA.map(
       async (alertMap: IAlertMap.IAlertMap): Promise<void> => {
         const key = `${ alertMap.account_code }-${ alertMap.zone_name }`;
         const fenceAlert = await prisma.fence_alerts.findUnique({ where: { key }});
-        const alertMapQuantityMultiple = Math.round(alertMap.quantity / MAXIMUM_QUANTITY) * MAXIMUM_QUANTITY;
+        const alertMapQuantityMultiple = Math.floor(alertMap.quantity / MAXIMUM_QUANTITY) * MAXIMUM_QUANTITY;
 
-        if (!fenceAlert && alertMap.quantity > MAXIMUM_QUANTITY) {
+        if (!fenceAlert && alertMap.quantity >= MAXIMUM_QUANTITY) {
           await prisma.fence_alerts.create(
             { 
               data: { 
@@ -63,7 +63,7 @@ const updateFenceAlerts = async (alertMapList: IAlertMap.IAlertMap[]): Promise<v
             }
           );
 
-          alertMapNotificationList.push(alertMap);
+          alertMapListB.push(alertMap);
         } else if (fenceAlert && alertMapQuantityMultiple > fenceAlert.quantity) {
           await prisma.fence_alerts.update(
             { 
@@ -72,18 +72,18 @@ const updateFenceAlerts = async (alertMapList: IAlertMap.IAlertMap[]): Promise<v
             }
           );
 
-          alertMapNotificationList.push(alertMap);
+          alertMapListB.push(alertMap);
         }
       }
     )
   );
 
-  if (alertMapNotificationList.length > 0) {
-    await sendBatchNotification(alertMapNotificationList);
+  if (alertMapListB.length > 0) {
+    await sendNotification(alertMapListB);
   }
 };
 
-export const createAlerts = async (): Promise<void> => {
+export const createFenceAlerts = async (): Promise<void> => {
   try {
     const httpClientInstance = new HttpClientUtil.HttpClient();
 
@@ -102,7 +102,7 @@ export const createAlerts = async (): Promise<void> => {
     );
 
     const response = (
-      await httpClientInstance.post<unknown>(
+      await httpClientInstance.post<any>(
         'http://localhost:3042/api/v1/get/query-data-map',
         { filterMap: { name: 'fence_alert_get_alert_map_list' } }
       )
@@ -111,7 +111,7 @@ export const createAlerts = async (): Promise<void> => {
     const alertMapList = response?.data;
     
     if (response?.status && alertMapList) {
-      await updateFenceAlerts(alertMapList);
+      await processFenceAlerts(alertMapList);
     }
   } catch (error: unknown) {
     console.log(`Error | Timestamp: ${ momentTimezone().utc().format('DD-MM-YYYY HH:mm:ss') } | Path: src/services/createAlerts.service.ts | Location: createAlerts | Error: ${ error instanceof Error ? error.message : String(error) }`);
