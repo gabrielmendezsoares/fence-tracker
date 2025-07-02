@@ -2,10 +2,10 @@ import express, { Express, NextFunction, Request, Response } from 'express';
 import momentTimezone from 'moment-timezone';
 import morgan from 'morgan';
 import nodeSchedule from 'node-schedule';
-import { PrismaClient } from '@prisma/client/storage/client.js';
+import { Prisma, PrismaClient } from '@prisma/client/storage/client.js';
 import startServer, { router, getAccessLog, createServer } from '../expressium/src/index.js';
 import { appRoute } from './routes/index.js';
-import { createAlertsService } from './services/index.js';
+import { createFenceAlertsService } from './services/index.js';
 
 const prisma = new PrismaClient();
 
@@ -53,10 +53,11 @@ const buildServer = async (): Promise<void> => {
     
     startServer(serverInstance as Express);
 
-    await createAlertsService.createAlerts();
+    await createFenceAlertsService.createFenceAlerts();
 
-    nodeSchedule.scheduleJob('0 0 */12 * * *', (): Promise<void> => prisma.fence_alerts.deleteMany());
-    nodeSchedule.scheduleJob('0 */1 * * * *', createAlertsService.createAlerts);
+    nodeSchedule.scheduleJob('0 0 0 * * *', (): Promise<Prisma.BatchPayload> => prisma.fence_alerts.deleteMany());
+    nodeSchedule.scheduleJob('0 0 12 * * *', (): Promise<Prisma.BatchPayload> => prisma.fence_alerts.deleteMany());
+    nodeSchedule.scheduleJob('0 */1 * * * *', createFenceAlertsService.createFenceAlerts);
   } catch (error: unknown) {
     console.log(`Error | Timestamp: ${ momentTimezone().utc().format('DD-MM-YYYY HH:mm:ss') } | Path: src/index.ts | Location: buildServer | Error: ${ error instanceof Error ? error.message : String(error) }`);
     process.exit(1);
