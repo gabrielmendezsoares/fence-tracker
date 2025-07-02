@@ -55,7 +55,8 @@ const buildServer = async (): Promise<void> => {
 
     await createAlertsService.createAlerts();
 
-    nodeSchedule.scheduleJob('0 0 */12 * * *', (): Promise<void> => prisma.fence_alerts.deleteMany());
+    nodeSchedule.scheduleJob('0 0 0 * * *', (): Promise<void> => prisma.fence_alerts.deleteMany());
+    nodeSchedule.scheduleJob('0 0 12 * * *', (): Promise<void> => prisma.fence_alerts.deleteMany());
     nodeSchedule.scheduleJob('0 */1 * * * *', createAlertsService.createAlerts);
   } catch (error: unknown) {
     console.log(`Error | Timestamp: ${ momentTimezone().utc().format('DD-MM-YYYY HH:mm:ss') } | Path: src/index.ts | Location: buildServer | Error: ${ error instanceof Error ? error.message : String(error) }`);

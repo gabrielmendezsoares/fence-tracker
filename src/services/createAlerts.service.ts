@@ -11,21 +11,21 @@ const sendBatchNotification = async (alertMapNotificationList: IAlertMap.IAlertM
   try {
     const httpClientInstance = new HttpClientUtil.HttpClient();
     const messageHeader = '📌 *ALERTA (CERCA)* 📌\n\n';
+    const messageSubHeader = `Período: ${ momentTimezone().utc().hour() < 12 ? '00:00 - 12:00' : '12:00 - 00:00' }\n\n`;
 
     const alertMessageList = alertMapNotificationList.map(
       (alertMap: IAlertMap.IAlertMap): string => {
         return [
-          '[12-horas]',
-          `- CSID: ${ alertMap.account_code }`,
+          `[${ alertMap.account_code }]`,
           `- Armário: ${ alertMap.cabinet }`,
           `- Condomínio: ${ alertMap.condominium }`,
           `- Quantidade: ${ alertMap.quantity }`,
-          `- Zona: ${ alertMap.zone_name }`
+          `- Zona: ${ alertMap.zone_name }`,
         ].join('\n');
       }
     );
 
-    const message = messageHeader + alertMessageList.join('\n\n');
+    const message = messageHeader + messageSubHeader + alertMessageList.join('\n\n');
 
     await httpClientInstance.post<unknown>(
       `https://v5.chatpro.com.br/${ process.env.CHAT_PRO_INSTANCE_ID }/api/v1/send_message`,
@@ -45,7 +45,6 @@ const sendBatchNotification = async (alertMapNotificationList: IAlertMap.IAlertM
 
 const updateFenceAlerts = async (alertMapList: IAlertMap.IAlertMap[]): Promise<void> => {
   const alertMapNotificationList: IAlertMap.IAlertMap[] = [];
-  const keyList: string[] = [];
 
   await Promise.allSettled(
     alertMapList.map(
@@ -75,13 +74,9 @@ const updateFenceAlerts = async (alertMapList: IAlertMap.IAlertMap[]): Promise<v
 
           alertMapNotificationList.push(alertMap);
         }
-
-        keyList.push(key);
       }
     )
   );
-
-  await prisma.fence_alerts.deleteMany({ where: { key: { notIn: keyList } } });
 
   if (alertMapNotificationList.length > 0) {
     await sendBatchNotification(alertMapNotificationList);
