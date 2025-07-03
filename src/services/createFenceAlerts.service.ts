@@ -13,7 +13,7 @@ const sendNotification = async (alertMapList: IAlertMap.IAlertMap[]): Promise<vo
     const messageHeader = '📌 *ALERTA (CERCA)* 📌\n\n';
     const messageSubHeader = `Período: ${ momentTimezone().utc().hour() < 12 ? '00:00 - 12:00' : '12:00 - 00:00' }\n\n`;
 
-    const alertMessageList = alertMapList.map(
+    const messageContentList = alertMapList.map(
       (alertMap: IAlertMap.IAlertMap): string => {
         return [
           `[${ alertMap.account_code }]`,
@@ -25,7 +25,7 @@ const sendNotification = async (alertMapList: IAlertMap.IAlertMap[]): Promise<vo
       }
     );
 
-    const message = messageHeader + messageSubHeader + alertMessageList.join('\n\n');
+    const message = messageHeader + messageSubHeader + messageContentList.join('\n\n');
 
     await httpClientInstance.post<unknown>(
       `https://v5.chatpro.com.br/${ process.env.CHAT_PRO_INSTANCE_ID }/api/v1/send_message`,
@@ -39,7 +39,7 @@ const sendNotification = async (alertMapList: IAlertMap.IAlertMap[]): Promise<vo
       }
     );
   } catch (error: unknown) {
-    console.log(`Error | Timestamp: ${ momentTimezone().utc().format('DD-MM-YYYY HH:mm:ss') } | Path: src/services/createAlerts.service.ts | Location: sendNotification | Error: ${ error instanceof Error ? error.message : String(error) }`);
+    console.log(`Error | Timestamp: ${ momentTimezone().utc().format('DD-MM-YYYY HH:mm:ss') } | Path: src/services/createFenceAlerts.service.ts | Location: sendNotification | Error: ${ error instanceof Error ? error.message : String(error) }`);
   }
 };
 
@@ -114,6 +114,6 @@ export const createFenceAlerts = async (): Promise<void> => {
       await processFenceAlerts(alertMapList);
     }
   } catch (error: unknown) {
-    console.log(`Error | Timestamp: ${ momentTimezone().utc().format('DD-MM-YYYY HH:mm:ss') } | Path: src/services/createAlerts.service.ts | Location: createAlerts | Error: ${ error instanceof Error ? error.message : String(error) }`);
+    console.log(`Error | Timestamp: ${ momentTimezone().utc().format('DD-MM-YYYY HH:mm:ss') } | Path: src/services/createFenceAlerts.service.ts | Location: createFenceAlerts | Error: ${ error instanceof Error ? error.message : String(error) }`);
   }
 };
