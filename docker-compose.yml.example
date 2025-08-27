@@ -8,7 +8,7 @@ x-common-variables: &common-variables
 services:
   main-development:
     <<: *common-variables
-    container_name: main-development-fence-alert
+    container_name: main-development-fence-tracker
     build:
       context: .
       dockerfile: Dockerfile
@@ -24,7 +24,7 @@ services:
       
   main-production:
     <<: *common-variables
-    container_name: main-production-fence-alert
+    container_name: main-production-fence-tracker
     build:
       context: .
       dockerfile: Dockerfile
@@ -37,7 +37,7 @@ services:
 
   db:
     <<: *common-variables
-    container_name: db-mysql-fence-alert
+    container_name: db-mysql-fence-tracker
     image: mysql:8.0
     ports:
       - "4406:3306"
