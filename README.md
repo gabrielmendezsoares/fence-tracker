@@ -25,7 +25,7 @@ To prevent redundant notifications, Fence Tracker persists the last triggered st
 
 - [**Node.js**](https://nodejs.org/) ≥ `20.14.0` — _JavaScript runtime environment_
 - [**MySQL**](https://www.mysql.com/) ≥ `8.0` — _Relational database_
-- [**Query Gateway**](https://github.com/gabrielmendezsoares/query-gateway) ≥ `3.0.2` — _Configurable data query service_
+- [**Query Gateway**](https://github.com/gabrielmendezsoares/query-gateway) ≥ `3.0.3` — _Configurable data query service_
 
 ### ⚙️ Setup 
 
