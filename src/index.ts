@@ -1,17 +1,27 @@
 import cors from 'cors';
 import express, { Express, Request, Response } from 'express';
-import nodeSchedule from 'node-schedule';
 import { createRequire } from 'module';
-import { Prisma, PrismaClient } from '@prisma/client/storage/client.js';
 import { expressiumRoute, loggerUtil, startServer, createServer } from '../expressium/index.js';
 import { appRoute } from './routes/index.js';
-import { fetchAlertMapListService } from './services/index.js';
+import { createAlertsService } from './services/index.js';
 
 const require = createRequire(import.meta.url);
 
 const helmet = require('helmet');
 
-const prisma = new PrismaClient();
+const MONITORING_INTERVAL = 60_000;
+
+const createSequentialInterval = async (
+  handler: () => Promise<void>, 
+  interval: number
+): Promise<void> => {
+  const executeWithDelay = async (): Promise<void> => {
+    await handler();
+    setTimeout(executeWithDelay, interval).unref();
+  };
+
+  executeWithDelay();
+};
 
 const buildServer = async (): Promise<void> => {
   try {
@@ -42,12 +52,11 @@ const buildServer = async (): Promise<void> => {
     const serverInstance = await createServer(app);
     
     await startServer(serverInstance as Express);
-    
-    await fetchAlertMapListService.fetchAlertMapList();
 
-    nodeSchedule.scheduleJob('0 0 0 * * *', (): Promise<Prisma.BatchPayload> => prisma.fence_tracker_triggers.deleteMany());
-    nodeSchedule.scheduleJob('0 0 12 * * *', (): Promise<Prisma.BatchPayload> => prisma.fence_tracker_triggers.deleteMany());
-    nodeSchedule.scheduleJob('0 */1 * * * *', fetchAlertMapListService.fetchAlertMapList);
+    createSequentialInterval(
+      createAlertsService.createAlerts, 
+      MONITORING_INTERVAL
+    );
   } catch (error: unknown) {
     loggerUtil.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
