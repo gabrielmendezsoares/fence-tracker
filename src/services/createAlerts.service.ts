@@ -64,6 +64,7 @@ export const createAlerts = async (): Promise<void> => {
         async (alertMap: IAlertMap.IAlertMap): Promise<void> => {
           const alertMapAccountCode = alertMap.account_code;
           const alertMapZoneName = alertMap.zone_name;
+          const alertMapQuantity = alertMap.quantity;
 
           const fenceTrackerTrigger = await prisma.fence_tracker_triggers.findUnique(
             { 
@@ -76,7 +77,7 @@ export const createAlerts = async (): Promise<void> => {
             }
           );
 
-          const alertMapQuantity = alertMap.quantity;
+          const alertMapQuantityMultiple = Math.floor(alertMapQuantity / EVENTS_COUNT_THRESHOLD) * EVENTS_COUNT_THRESHOLD;
 
           const processAlertMap = async (): Promise<void> => {
             await prisma.fence_tracker_triggers.create(
@@ -100,9 +101,7 @@ export const createAlerts = async (): Promise<void> => {
                 params: { instance_id: process.env.CHAT_PRO_INSTANCE_ID }
               }
             );
-          }
-
-          const alertMapQuantityMultiple = Math.floor(alertMapQuantity / EVENTS_COUNT_THRESHOLD) * EVENTS_COUNT_THRESHOLD;
+          };
   
           if (!fenceTrackerTrigger && alertMapQuantity >= EVENTS_COUNT_THRESHOLD) {
             processAlertMap();
