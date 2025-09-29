@@ -1,24 +1,32 @@
 openapi: 3.0.3
 info:
   title: 🚧 Fence Tracker
-  version: 2.0.2
+  version: 2.0.4
   description: |
     ## 📋 Overview
 
-    Fence Tracker is a zone-based monitoring and alerting service that identifies when activity levels within specific geographic or logical zones exceed a configured threshold. It fetches data from a centralized Query Gateway, evaluates it against defined rules, and sends alerts when meaningful increases occur.
+    Fence Tracker is a scheduled zone-based alerting service that monitors activity levels in defined geographic or logical zones. It operates on a rolling 12-hour window, splitting each day into two distinct monitoring periods (00:00–11:59 and 12:00–23:59), based on São Paulo local time.
 
-    To prevent redundant notifications, Fence Tracker persists the last triggered state for each zone in a MySQL database. When a new threshold multiple is crossed, it formats and dispatches a structured alert message via an external messaging system.
+    The system retrieves aggregated event counts per account and zone from a centralized Query Gateway. If the number of events exceeds a configurable threshold, Fence Tracker generates and sends an alert via WhatsApp, while persisting alert states to prevent duplicate notifications.
+
+    To ensure reliability and accuracy, Fence Tracker uses a trigger table to track previously sent alerts and only notifies on new threshold crossings (e.g., from 50 to 100 events). It also automatically cleans up outdated trigger records at the start of each new 12-hour cycle.
+
+    Fence Tracker helps operational teams respond to abnormal zone activity quickly and effectively, reducing noise and increasing situational awareness.
 
     ### 🎯 Objectives
 
-    - Fetch the latest fence activity data using a named query from the Query Gateway
-    - Detect when the quantity per zone exceeds a defined threshold (e.g., 50)
-    - Persist trigger states in a MySQL database using Prisma to track previously alerted values
-    - Prevent duplicate alerts by only triggering when thresholds escalate beyond prior values
-    - Generate structured alert messages containing relevant zone and account information
-    - Send alerts to a configurable external messaging endpoint
-    - Use Basic and Bearer authentication strategies for secure communication with the Query Gateway
-    - Provide a scalable and maintainable alert pipeline for fence-based activity monitoring
+    - Monitor zone activity on a 12-hour rolling window (00:00–11:59 or 12:00–23:59)
+    - Retrieve aggregated zone activity data from the Query Gateway via named queries
+    - Filter and count events per account and zone
+    - Detect when event counts exceed a defined threshold (e.g., 50 events)
+    - Calculate and track alert states using a Prisma-managed trigger table
+    - Avoid duplicate notifications by only triggering on threshold multiples
+    - Clean up expired trigger records at the start of each 12-hour window
+    - Format alert messages with account, zone, cabinet, and condominium details
+    - Send alert notifications via WhatsApp using the ChatPro API
+    - Support Basic and Bearer token authentication for secure API access
+    - Log all operations and errors for auditability and diagnostics
+    - Run as a recurring scheduled job integrated with backend infrastructure
 servers:
   - url: http://localhost:3892
     description: Development server
