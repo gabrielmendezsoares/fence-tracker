@@ -46,57 +46,7 @@ export const createAlerts = async (): Promise<void> => {
       return;
     }
 
-    const alertMapListB: IAlertMap.IAlertMap[] = [];
-
-    await Promise.allSettled(
-      alertMapListA.map(
-        async (alertMap: IAlertMap.IAlertMap): Promise<void> => {
-          const key = `${ alertMap.account_code }-${ alertMap.zone_name }`;
-          const fenceTrackerTrigger = await prisma.fence_tracker_triggers.findUnique({ where: { key }});
-          const alertMapQuantityMultiple = Math.floor(alertMap.quantity / EVENTS_COUNT_THRESHOLD) * EVENTS_COUNT_THRESHOLD;
-  
-          if (!fenceTrackerTrigger && alertMap.quantity >= EVENTS_COUNT_THRESHOLD) {
-            await prisma.fence_tracker_triggers.create(
-              { 
-                data: { 
-                  key,
-                  quantity: alertMapQuantityMultiple
-                } 
-              }
-            );
-  
-            alertMapListB.push(alertMap);
-          } else if (fenceTrackerTrigger && alertMapQuantityMultiple > fenceTrackerTrigger.quantity) {
-            await prisma.fence_tracker_triggers.update(
-              { 
-                where: { key },
-                data: { quantity: alertMapQuantityMultiple } 
-              }
-            );
-  
-            alertMapListB.push(alertMap);
-          }
-        }
-      )
-    );
-  
-    if (!alertMapListB.length) {
-      return;
-    }
-
     const whatsAppHttpClientInstance = new HttpClientUtil.HttpClient();
-
-    const messageContentList = alertMapListB.map(
-      (alertMap: IAlertMap.IAlertMap): string => {
-        return [
-          `*Conta:* ${ alertMap.account_code }`,
-          `*Condomínio:* ${ alertMap.condominium }`,
-          `*Armário:* ${ alertMap.cabinet }`,
-          `*Zona:* ${ alertMap.zone_name }`,
-          `*Quantidade:* ${ alertMap.quantity }`
-        ].join('\n');
-      }
-    );
 
     let startDateFormattation;
     let endDateFormattation;
@@ -109,16 +59,58 @@ export const createAlerts = async (): Promise<void> => {
       endDateFormattation = date.clone().hours(23).minutes(59).seconds(59);
     }
 
-    await whatsAppHttpClientInstance.post<unknown>(
-      `https://v5.chatpro.com.br/${ process.env.CHAT_PRO_INSTANCE_ID }/api/v1/send_message`,
-      {
-        message: `⚠️ *ALERTA CERCA* ⚠️\n\n${ messageContentList.join('\n\n') }\n\n*Período Inicial:* ${ startDateFormattation }\n*Período Final:* ${ endDateFormattation }`,
-        number: process.env.CHAT_PRO_NUMBER
-      },
-      { 
-        headers: { Authorization: process.env.CHAT_PRO_BEARER_TOKEN },
-        params: { instance_id: process.env.CHAT_PRO_INSTANCE_ID }
-      }
+    await Promise.allSettled(
+      alertMapListA.map(
+        async (alertMap: IAlertMap.IAlertMap): Promise<void> => {
+          const alertMapAccountCode = alertMap.account_code;
+          const alertMapZoneName = alertMap.zone_name;
+
+          const fenceTrackerTrigger = await prisma.fence_tracker_triggers.findUnique(
+            { 
+              where: { 
+                account_code_zone_name: {
+                  account_code: alertMapAccountCode,
+                  zone_name: alertMapZoneName
+                } 
+              }
+            }
+          );
+
+          const alertMapQuantity = alertMap.quantity;
+
+          const processAlertMap = async (): Promise<void> => {
+            await prisma.fence_tracker_triggers.create(
+              { 
+                data: { 
+                  account_code: alertMapAccountCode,
+                  zone_name: alertMapZoneName,
+                  quantity: alertMapQuantityMultiple
+                } 
+              }
+            );
+  
+            await whatsAppHttpClientInstance.post<unknown>(
+              `https://v5.chatpro.com.br/${ process.env.CHAT_PRO_INSTANCE_ID }/api/v1/send_message`,
+              {
+                message: `⚠️ *ALERTA CERCA* ⚠️\n\n*Conta:* ${ alertMapAccountCode }\n*Condomínio:* ${ alertMap.condominium }\n*Armário:* ${ alertMap.cabinet }\n*Zona:* ${ alertMapZoneName }\n*Quantidate*: ${ alertMapQuantityMultiple }\n*Período Inicial:* ${ startDateFormattation }\n*Período Final:* ${ endDateFormattation }`,
+                number: process.env.CHAT_PRO_NUMBER
+              },
+              { 
+                headers: { Authorization: process.env.CHAT_PRO_BEARER_TOKEN },
+                params: { instance_id: process.env.CHAT_PRO_INSTANCE_ID }
+              }
+            );
+          }
+
+          const alertMapQuantityMultiple = Math.floor(alertMapQuantity / EVENTS_COUNT_THRESHOLD) * EVENTS_COUNT_THRESHOLD;
+  
+          if (!fenceTrackerTrigger && alertMapQuantity >= EVENTS_COUNT_THRESHOLD) {
+            processAlertMap();
+          } else if (fenceTrackerTrigger && alertMapQuantityMultiple > fenceTrackerTrigger.quantity) {
+            processAlertMap();
+          }
+        }
+      )
     );
   } catch (error: unknown) {
     loggerUtil.error(error instanceof Error ? error.message : String(error));
