@@ -11,13 +11,19 @@ const prisma = new PrismaClient();
 
 export const createAlerts = async (): Promise<void> => {
   try {
-    const date = momentTimezone.tz('America/Sao_Paulo');
+    const dateA = momentTimezone.utc();
 
-    if (date.hours() < 12) {
-      await prisma.fence_tracker_triggers.deleteMany({ where: { updated_at: { lt: date.clone().hours(0).minutes(0).seconds(0).toDate() } } });
-    } else {
-      await prisma.fence_tracker_triggers.deleteMany({ where: { updated_at: { lt: date.clone().hours(12).minutes(0).seconds(0).toDate() } } });
-    }
+    await prisma.fence_tracker_triggers.deleteMany(
+      {
+        where: {
+          updated_at: {
+            lt: dateA.hours() < 15
+              ? dateA.clone().hours(3).minutes(0).seconds(0).milliseconds(0).toDate()
+              : dateA.clone().hours(15).minutes(0).seconds(0).milliseconds(0).toDate()
+          }
+        }
+      }
+    );
 
     const queryGatewayHttpClientInstance = new HttpClientUtil.HttpClient();
 
@@ -42,24 +48,18 @@ export const createAlerts = async (): Promise<void> => {
       )
     ).data?.data?.fence_tracker_get_alert_map_list;
     
-    if (!alertMapListA) {
+    if (!alertMapListA?.length) {
       return;
     }
 
+    const dateB = momentTimezone.tz('America/Sao_Paulo');
+    const startDate = dateB.hours() < 12 ? dateB.clone().hours(0).minutes(0).seconds(0) : dateB.clone().hours(12).minutes(0).seconds(0);
+    const endDate = dateB.hours() < 12 ? dateB.clone().hours(11).minutes(59).seconds(59) : dateB.clone().hours(23).minutes(59).seconds(59);
     const whatsAppHttpClientInstance = new HttpClientUtil.HttpClient();
+    const startDateFormattation = startDate.clone().format('DD/MM/YYYY HH:mm:ss');
+    const endDateFormattation = endDate.clone().format('DD/MM/YYYY HH:mm:ss');
 
-    let startDateFormattation;
-    let endDateFormattation;
-
-    if (date.hours() < 12) {
-      startDateFormattation = date.clone().hours(0).minutes(0).seconds(0);
-      endDateFormattation = date.clone().hours(11).minutes(59).seconds(59);
-    } else {
-      startDateFormattation = date.clone().hours(12).minutes(0).seconds(0);
-      endDateFormattation = date.clone().hours(23).minutes(59).seconds(59);
-    }
-
-    await Promise.allSettled(
+    Promise.allSettled(
       alertMapListA.map(
         async (alertMap: IAlertMap.IAlertMap): Promise<void> => {
           const alertMapAccountCode = alertMap.account_code;
@@ -78,8 +78,8 @@ export const createAlerts = async (): Promise<void> => {
           );
 
           const alertMapQuantityMultiple = Math.floor(alertMapQuantity / EVENTS_COUNT_THRESHOLD) * EVENTS_COUNT_THRESHOLD;
-
-          const processAlertMap = async (): Promise<void> => {
+  
+          if (!fenceTrackerTrigger && alertMapQuantity >= EVENTS_COUNT_THRESHOLD) {
             await prisma.fence_tracker_triggers.create(
               { 
                 data: { 
@@ -89,8 +89,22 @@ export const createAlerts = async (): Promise<void> => {
                 } 
               }
             );
-  
-            await whatsAppHttpClientInstance.post<unknown>(
+
+            await prisma.fence_tracker_registers.create(
+              {
+                data: {
+                  account_code: alertMapAccountCode,
+                  condominium: alertMap.condominium,
+                  cabinet: alertMap.cabinet,
+                  zone_name: alertMapZoneName,
+                  quantity: alertMapQuantityMultiple,
+                  period_started_at: startDate.toDate(),
+                  period_ended_at: endDate.toDate()
+                }
+              }
+            );
+
+            whatsAppHttpClientInstance.post<unknown>(
               `https://v5.chatpro.com.br/${ process.env.CHAT_PRO_INSTANCE_ID }/api/v1/send_message`,
               {
                 message: `⚠️ *ALERTA CERCA* ⚠️\n\n*Conta:* ${ alertMapAccountCode }\n*Condomínio:* ${ alertMap.condominium }\n*Armário:* ${ alertMap.cabinet }\n*Zona:* ${ alertMapZoneName }\n*Quantidate*: ${ alertMapQuantityMultiple }\n*Período Inicial:* ${ startDateFormattation }\n*Período Final:* ${ endDateFormattation }`,
@@ -101,12 +115,44 @@ export const createAlerts = async (): Promise<void> => {
                 params: { instance_id: process.env.CHAT_PRO_INSTANCE_ID }
               }
             );
-          };
-  
-          if (!fenceTrackerTrigger && alertMapQuantity >= EVENTS_COUNT_THRESHOLD) {
-            processAlertMap();
           } else if (fenceTrackerTrigger && alertMapQuantityMultiple > fenceTrackerTrigger.quantity) {
-            processAlertMap();
+            await prisma.fence_tracker_triggers.update(
+              { 
+                where: {
+                  account_code_zone_name: {
+                    account_code: alertMapAccountCode,
+                    zone_name: alertMapZoneName
+                  } 
+                },
+                data: { quantity: alertMapQuantityMultiple } 
+              }
+            );
+
+            await prisma.fence_tracker_registers.create(
+              {
+                data: {
+                  account_code: alertMapAccountCode,
+                  condominium: alertMap.condominium,
+                  cabinet: alertMap.cabinet,
+                  zone_name: alertMapZoneName,
+                  quantity: alertMapQuantityMultiple,
+                  period_started_at: startDate.toDate(),
+                  period_ended_at: endDate.toDate()
+                }
+              }
+            );
+
+            whatsAppHttpClientInstance.post<unknown>(
+              `https://v5.chatpro.com.br/${ process.env.CHAT_PRO_INSTANCE_ID }/api/v1/send_message`,
+              {
+                message: `⚠️ *ALERTA CERCA* ⚠️\n\n*Conta:* ${ alertMapAccountCode }\n*Condomínio:* ${ alertMap.condominium }\n*Armário:* ${ alertMap.cabinet }\n*Zona:* ${ alertMapZoneName }\n*Quantidate*: ${ alertMapQuantityMultiple }\n*Período Inicial:* ${ startDateFormattation }\n*Período Final:* ${ endDateFormattation }`,
+                number: process.env.CHAT_PRO_NUMBER
+              },
+              { 
+                headers: { Authorization: process.env.CHAT_PRO_BEARER_TOKEN },
+                params: { instance_id: process.env.CHAT_PRO_INSTANCE_ID }
+              }
+            );
           }
         }
       )
