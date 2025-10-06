@@ -5,15 +5,18 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 
 DROP TABLE IF EXISTS `application_types`;
+DROP TABLE IF EXISTS `database_types`;
 DROP TABLE IF EXISTS `role_types`;
 
 
-DROP TABLE IF EXISTS `sigma_cloud_alarm_events`;
+DROP TABLE IF EXISTS `databases`;
 DROP TABLE IF EXISTS `fence_tracker_registers`;
 DROP TABLE IF EXISTS `fence_tracker_triggers`;
+DROP TABLE IF EXISTS `query_gateway_queries`;
+DROP TABLE IF EXISTS `sigma_cloud_alarm_events`;
 DROP TABLE IF EXISTS `users`;
 
-
+ 
 DROP EVENT IF EXISTS `delete_sigma_cloud_alarm_events`;
 DROP EVENT IF EXISTS `delete_fence_tracker_registers`;
 
@@ -37,6 +40,19 @@ CREATE TABLE `application_types` (
     INDEX `idx_updated_at` (`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `database_types` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `database_type` VARCHAR(255) NOT NULL UNIQUE,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (`id`),
+
+    INDEX `idx_database_type` (`database_type`),
+    INDEX `idx_created_at` (`created_at`),
+    INDEX `idx_updated_at` (`updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `role_types` (
     `id` INT NOT NULL AUTO_INCREMENT,
     `role_type` VARCHAR(255) NOT NULL UNIQUE,
@@ -51,39 +67,26 @@ CREATE TABLE `role_types` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
-CREATE TABLE `sigma_cloud_alarm_events` (
+CREATE TABLE `databases` (
     `id` INT NOT NULL AUTO_INCREMENT,
-    `application_type` VARCHAR(255) NOT NULL,
-    `account` VARCHAR(255) NOT NULL,
-    `auxiliary` VARCHAR(255) NOT NULL,
-    `code` VARCHAR(255) NOT NULL,
-    `company_id` INT UNSIGNED NOT NULL,
-    `complement` VARCHAR(255) NOT NULL,
-    `event_id` VARCHAR(255) NOT NULL,
-    `event_log` VARCHAR(255) NOT NULL,
-    `partition` VARCHAR(255) NOT NULL,
-    `protocol_type` VARCHAR(255) NOT NULL,
-    `status` VARCHAR(255) NOT NULL,
-    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    CHECK (`status` IN ('failed', 'sent')),
+    `name` VARCHAR(255) UNIQUE NOT NULL,
+    `database_type` VARCHAR(255) NOT NULL,
+    `host` LONGBLOB,
+    `port` INT,
+    `database` LONGBLOB,
+    `username` LONGBLOB NOT NULL,
+    `password` LONGBLOB NOT NULL,
+    `connect_string` LONGBLOB,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     PRIMARY KEY (`id`),
 
-    FOREIGN KEY (`application_type`) REFERENCES `application_types`(`application_type`) ON DELETE CASCADE,
+    FOREIGN KEY (`database_type`) REFERENCES `database_types`(`database_type`) ON DELETE CASCADE,
 
-    INDEX `idx_application_type` (`application_type`),
-    INDEX `idx_account` (`account`),
-    INDEX `idx_auxiliary` (`auxiliary`),
-    INDEX `idx_code` (`code`),
-    INDEX `idx_company_id` (`company_id`),
-    INDEX `idx_complement` (`complement`),
-    INDEX `idx_event_id` (`event_id`),
-    INDEX `idx_event_log` (`event_log`),
-    INDEX `idx_partition` (`partition`),
-    INDEX `idx_protocol_type` (`protocol_type`),
-    INDEX `idx_status` (`status`),
+    INDEX `idx_name` (`name`),
+    INDEX `idx_database_type` (`database_type`),
+    INDEX `idx_port` (`port`),
     INDEX `idx_created_at` (`created_at`),
     INDEX `idx_updated_at` (`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -132,6 +135,70 @@ CREATE TABLE `fence_tracker_triggers` (
     INDEX `idx_updated_at` (`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `query_gateway_queries` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(255) UNIQUE NOT NULL,
+    `group_name` VARCHAR(255),
+    `database_id` INT NOT NULL,
+    `sql` LONGTEXT NOT NULL,
+    `variable_map` JSON,
+    `replacement_map` JSON,
+    `is_query_gateway_query_active` BOOLEAN NOT NULL DEFAULT FALSE,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT `variable_map` CHECK (JSON_TYPE(`variable_map`) = 'OBJECT'),
+    CONSTRAINT `replacement_map` CHECK (JSON_TYPE(`replacement_map`) = 'OBJECT'),
+
+    PRIMARY KEY (`id`),
+
+    FOREIGN KEY (`database_id`) REFERENCES `databases`(`id`) ON DELETE CASCADE,
+
+    INDEX `idx_name` (`name`),
+    INDEX `idx_group_name` (`group_name`),
+    INDEX `idx_database_id` (`database_id`),
+    INDEX `idx_is_query_gateway_query_active` (`is_query_gateway_query_active`),
+    INDEX `idx_created_at` (`created_at`),
+    INDEX `idx_updated_at` (`updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `sigma_cloud_alarm_events` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `application_type` VARCHAR(255) NOT NULL,
+    `account` VARCHAR(255) NOT NULL,
+    `auxiliary` VARCHAR(255) NOT NULL,
+    `code` VARCHAR(255) NOT NULL,
+    `company_id` INT UNSIGNED NOT NULL,
+    `complement` VARCHAR(255) NOT NULL,
+    `event_id` VARCHAR(255) NOT NULL,
+    `event_log` VARCHAR(255) NOT NULL,
+    `partition` VARCHAR(255) NOT NULL,
+    `protocol_type` VARCHAR(255) NOT NULL,
+    `status` VARCHAR(255) NOT NULL,
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CHECK (`status` IN ('failed', 'sent')),
+
+    PRIMARY KEY (`id`),
+
+    FOREIGN KEY (`application_type`) REFERENCES `application_types`(`application_type`) ON DELETE CASCADE,
+
+    INDEX `idx_application_type` (`application_type`),
+    INDEX `idx_account` (`account`),
+    INDEX `idx_auxiliary` (`auxiliary`),
+    INDEX `idx_code` (`code`),
+    INDEX `idx_company_id` (`company_id`),
+    INDEX `idx_complement` (`complement`),
+    INDEX `idx_event_id` (`event_id`),
+    INDEX `idx_event_log` (`event_log`),
+    INDEX `idx_partition` (`partition`),
+    INDEX `idx_protocol_type` (`protocol_type`),
+    INDEX `idx_status` (`status`),
+    INDEX `idx_created_at` (`created_at`),
+    INDEX `idx_updated_at` (`updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `users` (
     `id` INT NOT NULL AUTO_INCREMENT,
     `application_type` VARCHAR(255) NOT NULL,
@@ -174,6 +241,56 @@ DO
 DELIMITER //
 
 
+CREATE PROCEDURE `validate_database`(
+    IN `database_type` VARCHAR(50),
+    IN `host` LONGBLOB,
+    IN `database` LONGBLOB,
+    IN `connect_string` LONGBLOB,
+    OUT `is_valid` BOOLEAN,
+    OUT `error_message` VARCHAR(255)
+)
+BEGIN
+    SET `is_valid` = TRUE;
+    SET `error_message` = NULL;
+    
+    CASE `database_type`
+        WHEN 'MySQL' THEN
+            IF `host` IS NULL OR `database` IS NULL THEN
+                SET `is_valid` = FALSE;
+                SET `error_message` = 'Invalid database configuration: Both host and database are required';
+            END IF;
+
+        WHEN 'Oracle' THEN
+            IF `connect_string` IS NULL THEN
+                SET `is_valid` = FALSE;
+                SET `error_message` = 'Invalid database configuration: Connect string is required';
+            END IF;
+            
+        WHEN 'SQL Server' THEN
+            IF `host` IS NULL OR `database` IS NULL THEN
+                SET `is_valid` = FALSE;
+                SET `error_message` = 'Invalid database configuration: Both host and database are required';
+            END IF;
+    END CASE;
+END;
+//
+
+CREATE PROCEDURE `validate_query_gateway_query`(
+    IN `name` VARCHAR(255),
+    OUT `is_valid` BOOLEAN,
+    OUT `error_message` VARCHAR(255)
+)
+BEGIN
+    SET `is_valid` = TRUE;
+    SET `error_message` = NULL;
+    
+    IF `name` IN ('globalReplacementMap') THEN
+        SET `is_valid` = FALSE;
+        SET `error_message` = 'Invalid name: Cannot be globalReplacementMap';
+    END IF;
+END;
+//
+
 CREATE PROCEDURE `validate_user`(
     IN `role_list` JSON,
     OUT `is_valid` BOOLEAN,
@@ -203,6 +320,88 @@ BEGIN
 END;
 //
 
+
+CREATE TRIGGER `before_databases_insert`
+BEFORE INSERT ON `databases`
+FOR EACH ROW
+BEGIN
+    DECLARE `is_valid` BOOLEAN DEFAULT TRUE;
+    DECLARE `error_message` VARCHAR(255);
+    
+    CALL `validate_database`(
+        NEW.`database_type`,
+        NEW.`host`,
+        NEW.`database`,
+        NEW.`connect_string`,
+        `is_valid`,
+        `error_message`
+    );
+    
+    IF NOT `is_valid` THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = `error_message`;
+    END IF;
+END;
+//
+
+CREATE TRIGGER `before_databases_update`
+BEFORE UPDATE ON `databases`
+FOR EACH ROW
+BEGIN
+    DECLARE `is_valid` BOOLEAN DEFAULT TRUE;
+    DECLARE `error_message` VARCHAR(255);
+    
+    CALL `validate_database`(
+        NEW.`database_type`,
+        NEW.`host`,
+        NEW.`database`,
+        NEW.`connect_string`,
+        `is_valid`,
+        `error_message`
+    );
+    
+    IF NOT `is_valid` THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = `error_message`;
+    END IF;
+END;
+//
+
+CREATE TRIGGER `before_query_gateway_query_insert`
+BEFORE INSERT ON `query_gateway_queries`
+FOR EACH ROW
+BEGIN
+    DECLARE `is_valid` BOOLEAN DEFAULT TRUE;
+    DECLARE `error_message` VARCHAR(255);
+
+    CALL `validate_query_gateway_query`(
+        NEW.`name`,
+        `is_valid`,
+        `error_message`
+    );
+
+    IF NOT `is_valid` THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = `error_message`;
+    END IF;
+END;
+//
+
+CREATE TRIGGER `before_query_gateway_query_update`
+BEFORE UPDATE ON `query_gateway_queries`
+FOR EACH ROW
+BEGIN
+    DECLARE `is_valid` BOOLEAN DEFAULT TRUE;
+    DECLARE `error_message` VARCHAR(255);
+
+    CALL `validate_query_gateway_query`(
+        NEW.`name`,
+        `is_valid`,
+        `error_message`
+    );
+
+    IF NOT `is_valid` THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = `error_message`;
+    END IF;
+END;
+//
 
 CREATE TRIGGER `before_users_insert`
 BEFORE INSERT ON `users`
