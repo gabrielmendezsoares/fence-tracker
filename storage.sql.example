@@ -104,7 +104,7 @@ CREATE TABLE `fence_tracker_registers` (
 
     PRIMARY KEY (`id`),
 
-    UNIQUE KEY `unique_account_code_period_started_at_period_ended_at` (`account_code`, `period_started_at`, `period_ended_at`),
+    UNIQUE KEY `unique_account_code_zone_name_period_started_at_period_ended_at` (`account_code`, `zone_name`, `period_started_at`, `period_ended_at`),
 	
     INDEX `idx_account_code` (`account_code`),
     INDEX `idx_condominium` (`condominium`),

@@ -39,11 +39,9 @@ export const createAlerts = async (): Promise<void> => {
     }
 
     const date = momentTimezone.tz('America/Sao_Paulo');
-    const startDate = date.hours() < 12 ? date.clone().hours(0).minutes(0).seconds(0) : date.clone().hours(12).minutes(0).seconds(0);
-    const endDate = date.hours() < 12 ? date.clone().hours(11).minutes(59).seconds(59) : date.clone().hours(23).minutes(59).seconds(59);
     const whatsAppHttpClientInstance = new HttpClientUtil.HttpClient();
-    const startDateFormattation = startDate.clone().format('DD/MM/YYYY HH:mm:ss');
-    const endDateFormattation = endDate.clone().format('DD/MM/YYYY HH:mm:ss');
+    const startDateFormattation = date.hours() < 12 ? date.clone().hours(0).minutes(0).seconds(0).format('DD/MM/YYYY HH:mm:ss') : date.clone().hours(12).minutes(0).seconds(0).format('DD/MM/YYYY HH:mm:ss');
+    const endDateFormattation = date.hours() < 12 ? date.clone().hours(11).minutes(59).seconds(59).format('DD/MM/YYYY HH:mm:ss') : date.clone().hours(23).minutes(59).seconds(59).format('DD/MM/YYYY HH:mm:ss');
 
     Promise.allSettled(
       alertMapListA.map(
@@ -55,10 +53,11 @@ export const createAlerts = async (): Promise<void> => {
           const fenceTrackerRegister = await prisma.fence_tracker_registers.findUnique(
             { 
               where: { 
-                account_code_period_started_at_period_ended_at: {
+                account_code_zone_name_period_started_at_period_ended_at: {
                   account_code: alertMapAccountCode,
-                  period_started_at: startDate.toDate(),
-                  period_ended_at: endDate.toDate()
+                  zone_name: alertMapZoneName,
+                  period_started_at: date.hours() < 12 ? date.clone().hours(0).minutes(0).seconds(0).toDate() : date.clone().hours(12).minutes(0).seconds(0).toDate(),
+                  period_ended_at: date.hours() < 12 ? date.clone().hours(11).minutes(59).seconds(59).toDate() : date.clone().hours(23).minutes(59).seconds(59).toDate()
                 }
               }
             }
@@ -75,8 +74,8 @@ export const createAlerts = async (): Promise<void> => {
                   cabinet: alertMap.cabinet,
                   zone_name: alertMapZoneName,
                   quantity: alertMapQuantityMultiple,
-                  period_started_at: startDate.toDate(),
-                  period_ended_at: endDate.toDate()
+                  period_started_at: date.hours() < 12 ? date.clone().hours(0).minutes(0).seconds(0).toDate() : date.clone().hours(12).minutes(0).seconds(0).toDate(),
+                  period_ended_at: date.hours() < 12 ? date.clone().hours(11).minutes(59).seconds(59).toDate() : date.clone().hours(23).minutes(59).seconds(59).toDate()
                 }
               }
             );

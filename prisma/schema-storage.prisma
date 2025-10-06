@@ -515,7 +515,7 @@ model fence_tracker_registers {
   created_at        DateTime @default(now()) @db.Timestamp(0)
   updated_at        DateTime @default(now()) @db.Timestamp(0)
 
-  @@unique([account_code, period_started_at, period_ended_at], map: "unique_account_code_period_started_at_period_ended_at")
+  @@unique([account_code, zone_name, period_started_at, period_ended_at], map: "unique_account_code_zone_name_period_started_at_period_ended_at")
   @@index([account_code], map: "idx_account_code")
   @@index([cabinet], map: "idx_cabinet")
   @@index([condominium], map: "idx_condominium")
