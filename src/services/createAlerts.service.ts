@@ -11,20 +11,6 @@ const prisma = new PrismaClient();
 
 export const createAlerts = async (): Promise<void> => {
   try {
-    const dateA = momentTimezone.utc();
-
-    await prisma.fence_tracker_triggers.deleteMany(
-      {
-        where: {
-          updated_at: {
-            lt: dateA.hours() < 15
-              ? dateA.clone().hours(3).minutes(0).seconds(0).milliseconds(0).toDate()
-              : dateA.clone().hours(15).minutes(0).seconds(0).milliseconds(0).toDate()
-          }
-        }
-      }
-    );
-
     const queryGatewayHttpClientInstance = new HttpClientUtil.HttpClient();
 
     queryGatewayHttpClientInstance.setAuthenticationStrategy(
@@ -52,12 +38,10 @@ export const createAlerts = async (): Promise<void> => {
       return;
     }
 
-    const dateB = momentTimezone.tz('America/Sao_Paulo');
-    const startDate = dateB.hours() < 12 ? dateB.clone().hours(0).minutes(0).seconds(0) : dateB.clone().hours(12).minutes(0).seconds(0);
-    const endDate = dateB.hours() < 12 ? dateB.clone().hours(11).minutes(59).seconds(59) : dateB.clone().hours(23).minutes(59).seconds(59);
+    const date = momentTimezone.tz('America/Sao_Paulo');
     const whatsAppHttpClientInstance = new HttpClientUtil.HttpClient();
-    const startDateFormattation = startDate.clone().format('DD/MM/YYYY HH:mm:ss');
-    const endDateFormattation = endDate.clone().format('DD/MM/YYYY HH:mm:ss');
+    const startDateFormattation = date.hours() < 12 ? date.clone().hours(0).minutes(0).seconds(0).format('DD/MM/YYYY HH:mm:ss') : date.clone().hours(12).minutes(0).seconds(0).format('DD/MM/YYYY HH:mm:ss');
+    const endDateFormattation = date.hours() < 12 ? date.clone().hours(11).minutes(59).seconds(59).format('DD/MM/YYYY HH:mm:ss') : date.clone().hours(23).minutes(59).seconds(59).format('DD/MM/YYYY HH:mm:ss');
 
     Promise.allSettled(
       alertMapListA.map(
@@ -66,30 +50,22 @@ export const createAlerts = async (): Promise<void> => {
           const alertMapZoneName = alertMap.zone_name;
           const alertMapQuantity = alertMap.quantity;
 
-          const fenceTrackerTrigger = await prisma.fence_tracker_triggers.findUnique(
+          const fenceTrackerRegister = await prisma.fence_tracker_registers.findUnique(
             { 
               where: { 
-                account_code_zone_name: {
+                account_code_zone_name_period_started_at_period_ended_at: {
                   account_code: alertMapAccountCode,
-                  zone_name: alertMapZoneName
-                } 
+                  zone_name: alertMapZoneName,
+                  period_started_at: date.hours() < 12 ? date.clone().hours(0).minutes(0).seconds(0).toDate() : date.clone().hours(12).minutes(0).seconds(0).toDate(),
+                  period_ended_at: date.hours() < 12 ? date.clone().hours(11).minutes(59).seconds(59).toDate() : date.clone().hours(23).minutes(59).seconds(59).toDate()
+                }
               }
             }
           );
 
           const alertMapQuantityMultiple = Math.floor(alertMapQuantity / EVENTS_COUNT_THRESHOLD) * EVENTS_COUNT_THRESHOLD;
   
-          if (!fenceTrackerTrigger && alertMapQuantity >= EVENTS_COUNT_THRESHOLD) {
-            await prisma.fence_tracker_triggers.create(
-              { 
-                data: { 
-                  account_code: alertMapAccountCode,
-                  zone_name: alertMapZoneName,
-                  quantity: alertMapQuantityMultiple
-                } 
-              }
-            );
-
+          if (!fenceTrackerRegister && alertMapQuantity >= EVENTS_COUNT_THRESHOLD) {
             await prisma.fence_tracker_registers.create(
               {
                 data: {
@@ -98,8 +74,8 @@ export const createAlerts = async (): Promise<void> => {
                   cabinet: alertMap.cabinet,
                   zone_name: alertMapZoneName,
                   quantity: alertMapQuantityMultiple,
-                  period_started_at: startDate.toDate(),
-                  period_ended_at: endDate.toDate()
+                  period_started_at: date.hours() < 12 ? date.clone().hours(0).minutes(0).seconds(0).toDate() : date.clone().hours(12).minutes(0).seconds(0).toDate(),
+                  period_ended_at: date.hours() < 12 ? date.clone().hours(11).minutes(59).seconds(59).toDate() : date.clone().hours(23).minutes(59).seconds(59).toDate()
                 }
               }
             );
@@ -115,30 +91,11 @@ export const createAlerts = async (): Promise<void> => {
                 params: { instance_id: process.env.CHAT_PRO_INSTANCE_ID }
               }
             );
-          } else if (fenceTrackerTrigger && alertMapQuantityMultiple > fenceTrackerTrigger.quantity) {
-            await prisma.fence_tracker_triggers.update(
-              { 
-                where: {
-                  account_code_zone_name: {
-                    account_code: alertMapAccountCode,
-                    zone_name: alertMapZoneName
-                  } 
-                },
-                data: { quantity: alertMapQuantityMultiple } 
-              }
-            );
-
-            await prisma.fence_tracker_registers.create(
+          } else if (fenceTrackerRegister && alertMapQuantityMultiple > fenceTrackerRegister.quantity) {
+            await prisma.fence_tracker_registers.update(
               {
-                data: {
-                  account_code: alertMapAccountCode,
-                  condominium: alertMap.condominium,
-                  cabinet: alertMap.cabinet,
-                  zone_name: alertMapZoneName,
-                  quantity: alertMapQuantityMultiple,
-                  period_started_at: startDate.toDate(),
-                  period_ended_at: endDate.toDate()
-                }
+                where: { id: fenceTrackerRegister.id },
+                data: { quantity: alertMapQuantityMultiple }
               }
             );
 
