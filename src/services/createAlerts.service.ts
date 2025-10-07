@@ -43,7 +43,7 @@ export const createAlerts = async (): Promise<void> => {
     const startDateFormattation = date.hours() < 12 ? date.clone().hours(0).minutes(0).seconds(0).format('DD/MM/YYYY HH:mm:ss') : date.clone().hours(12).minutes(0).seconds(0).format('DD/MM/YYYY HH:mm:ss');
     const endDateFormattation = date.hours() < 12 ? date.clone().hours(11).minutes(59).seconds(59).format('DD/MM/YYYY HH:mm:ss') : date.clone().hours(23).minutes(59).seconds(59).format('DD/MM/YYYY HH:mm:ss');
 
-    Promise.allSettled(
+    await Promise.allSettled(
       alertMapListA.map(
         async (alertMap: IAlertMap.IAlertMap): Promise<void> => {
           const alertMapAccountCode = alertMap.account_code;
@@ -80,7 +80,7 @@ export const createAlerts = async (): Promise<void> => {
               }
             );
 
-            whatsAppHttpClientInstance.post<unknown>(
+            await whatsAppHttpClientInstance.post<unknown>(
               `https://v5.chatpro.com.br/${ process.env.CHAT_PRO_INSTANCE_ID }/api/v1/send_message`,
               {
                 message: `⚠️ *ALERTA CERCA* ⚠️\n\n*Conta:* ${ alertMapAccountCode }\n*Condomínio:* ${ alertMap.condominium }\n*Armário:* ${ alertMap.cabinet }\n*Zona:* ${ alertMapZoneName }\n*Quantidate*: ${ alertMapQuantityMultiple }\n*Período Inicial:* ${ startDateFormattation }\n*Período Final:* ${ endDateFormattation }`,
@@ -99,7 +99,7 @@ export const createAlerts = async (): Promise<void> => {
               }
             );
 
-            whatsAppHttpClientInstance.post<unknown>(
+            await whatsAppHttpClientInstance.post<unknown>(
               `https://v5.chatpro.com.br/${ process.env.CHAT_PRO_INSTANCE_ID }/api/v1/send_message`,
               {
                 message: `⚠️ *ALERTA CERCA* ⚠️\n\n*Conta:* ${ alertMapAccountCode }\n*Condomínio:* ${ alertMap.condominium }\n*Armário:* ${ alertMap.cabinet }\n*Zona:* ${ alertMapZoneName }\n*Quantidate*: ${ alertMapQuantityMultiple }\n*Período Inicial:* ${ startDateFormattation }\n*Período Final:* ${ endDateFormattation }`,
