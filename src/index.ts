@@ -53,7 +53,7 @@ const buildServer = async (): Promise<void> => {
     
     await startServer(serverInstance as Express);
 
-    createSequentialInterval(
+    await createSequentialInterval(
       createAlertsService.createAlerts, 
       MONITORING_INTERVAL
     );

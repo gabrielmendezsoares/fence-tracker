@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 🚧 Fence Tracker
-  version: 2.0.4
+  version: 2.0.5
   description: |
     ## 📋 Overview
 
